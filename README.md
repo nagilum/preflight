@@ -22,7 +22,7 @@ This will perform an `OPTIONS` request to the `https://api.example.com/url-to-ch
 
 ### HTTP Method
 
-You can specify another HTTP method than `GET` by using the `--method` or `-m` option, like so `--method POST`.
+You can specify a different HTTP method than `GET` by using the `--method` or `-m` option, like so `--method POST`.
 
 ### Headers
 
