@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+﻿using System.Net;
 using System.Net.Http.Headers;
 
 namespace Preflight;
@@ -38,7 +38,12 @@ internal static class Program
 
         Console.CancelKeyPress += (_, e) =>
         {
-            Console.WriteLine("Aborted by user!");
+            WriteLine(
+                ConsoleColor.DarkYellow,
+                "[WARNING] ",
+                (byte)0x00,
+                "Aborted by user!");
+            
             e.Cancel = true;
             tokenSource.Cancel();
         };
@@ -89,103 +94,200 @@ internal static class Program
             
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Clear();
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(Name, Version));
 
-            var req = new HttpRequestMessage(HttpMethod.Options, options.Url)
-            {
-                Headers = { { "Access-Control-Request-Method", options.HttpMethod } }
-            };
-            
-            WriteLine(
-                ConsoleColor.DarkCyan, 
-                "OPTIONS ", 
-                0x00, 
-                options.Url!);
-            
-            WriteLine(
-                ConsoleColor.DarkCyan, 
-                "> ", 
-                0x00, 
-                "Accept: ", 
-                ConsoleColor.White, "*/*");
-            
-            WriteLine(
-                ConsoleColor.DarkCyan, 
-                "> ", 
-                0x00, 
-                "User-Agent: ", 
-                ConsoleColor.White, 
-                $"{Name}/{Version}");
-            
-            WriteLine(
-                ConsoleColor.DarkCyan, 
-                "> ", 
-                0x00, 
-                "Access-Control-Request-Method: ", 
-                ConsoleColor.White, 
-                options.HttpMethod);
+            var req = new HttpRequestMessage(HttpMethod.Options, options.Url);
+
+            req.Headers.TryAddWithoutValidation("Access-Control-Request-Method", options.HttpMethod);
+            req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+            req.Headers.UserAgent.Add(new ProductInfoHeaderValue(Name, Version));
 
             if (options.Headers is not null)
             {
-                WriteLine(
-                    ConsoleColor.DarkCyan, 
-                    "> ", 
-                    0x00, 
-                    "Access-Control-Request-Headers: ", 
-                    ConsoleColor.White, 
-                    options.Headers);
-                
                 req.Headers.Add("Access-Control-Request-Headers", options.Headers);
             }
 
             if (options.Origin is not null)
             {
+                req.Headers.Add("Origin", options.Origin.ToString());
+            }
+            
+            WriteLine(
+                ConsoleColor.DarkCyan,
+                "[REQUEST] ",
+                (byte)0x00,
+                "OPTIONS ",
+                options.Url);
+
+            foreach (var (key, value) in req.Headers)
+            {
                 WriteLine(
-                    ConsoleColor.DarkCyan, 
-                    "> ", 
-                    0x00, 
-                    "Origin: ", 
-                    ConsoleColor.White, 
-                    options.Origin);
-                
-                req.Headers.Add("Origin", options.Origin);
+                    ConsoleColor.White,
+                    "[HEADER] ",
+                    (byte)0x00,
+                    key,
+                    ": ",
+                    ConsoleColor.White,
+                    value.First());
             }
 
-            var stopwatch = Stopwatch.StartNew();
+            // Perform request write out response.
             var res = await client.SendAsync(req, cancellationToken);
             
-            stopwatch.Stop();
-            
             WriteLine(
-                res.IsSuccessStatusCode ? ConsoleColor.DarkGreen : ConsoleColor.DarkRed, 
+                Environment.NewLine,
+                res.IsSuccessStatusCode ? ConsoleColor.DarkGreen : ConsoleColor.DarkRed,
+                "[RESPONSE] ",
+                (byte)0x00,
                 $"{(int)res.StatusCode} {res.ReasonPhrase}");
-            
-            WriteLine(
-                res.IsSuccessStatusCode ? ConsoleColor.DarkGreen : ConsoleColor.DarkRed, 
-                $"{stopwatch.ElapsedMilliseconds} ms");
 
             var headers = GetHeaders(res);
 
             foreach (var (key, value) in headers)
             {
                 WriteLine(
-                    ConsoleColor.DarkCyan,
-                    "< ",
-                    0x00,
+                    ConsoleColor.White,
+                    "[HEADER] ",
+                    (byte)0x00,
                     key,
                     ": ",
-                    key.StartsWith("Access-Control", StringComparison.OrdinalIgnoreCase)
-                        ? ConsoleColor.DarkGreen
-                        : ConsoleColor.White,
+                    ConsoleColor.White,
                     value);
+            }
+
+            // Is the status code valid?
+            if (res.StatusCode is HttpStatusCode.OK or HttpStatusCode.NoContent)
+            {
+                WriteLine(
+                    Environment.NewLine,
+                    ConsoleColor.DarkGreen,
+                    "[PASSED] ",
+                    (byte)0x00,
+                    "Status Code is either 200 or 204.");
+            }
+            else
+            {
+                WriteLine(
+                    Environment.NewLine,
+                    ConsoleColor.DarkRed,
+                    "[FAILED] ",
+                    (byte)0x00,
+                    "Status Code was neither 200 or 204!");
+            }
+            
+            // Do we have and allowed origin?
+            if (res.Headers.Contains("Access-Control-Allow-Origin"))
+            {
+                WriteLine(
+                    ConsoleColor.DarkGreen,
+                    "[PASSED] ",
+                    (byte)0x00,
+                    "Origin matches Access-Control-Allow-Origin.");
+            }
+            else
+            {
+                WriteLine(
+                    ConsoleColor.Red,
+                    "[FAILED] ",
+                    (byte)0x00,
+                    "Response did not contain Access-Control-Allow-Origin header!");
+            }
+            
+            // Do we have an allowed HTTP method?
+            if (res.Headers.Contains("Access-Control-Allow-Methods"))
+            {
+                WriteLine(
+                    ConsoleColor.DarkGreen,
+                    "[PASSED] ",
+                    (byte)0x00,
+                    "Access-Control-Request-Method matches Access-Control-Allow-Methods.");
+            }
+            else
+            {
+                WriteLine(
+                    ConsoleColor.Red,
+                    "[FAILED] ",
+                    (byte)0x00,
+                    "Response did not contain Access-Control-Allow-Methods header!");
+            }
+            
+            // Are we checking headers?
+            if (options.Headers is not null)
+            {
+                if (res.Headers.Contains("Access-Control-Allow-Headers"))
+                {
+                    WriteLine(
+                        ConsoleColor.DarkGreen,
+                        "[PASSED] ",
+                        (byte)0x00,
+                        "Access-Control-Request-Headers matches Access-Control-Allow-Headers.");
+                }
+                else
+                {
+                    WriteLine(
+                        ConsoleColor.Red,
+                        "[FAILED] ",
+                        (byte)0x00,
+                        "Response did not contain Access-Control-Allow-Headers header!");
+                }
+            }
+            else
+            {
+                WriteLine(
+                    ConsoleColor.DarkYellow,
+                    "[SKIPPED] ",
+                    (byte)0x00,
+                    "Access-Control-Request-Headers was not used.");
+            }
+            
+            // Do we have max-age?
+            if (res.Headers.TryGetValues("Access-Control-Max-Age", out var maxAgeValues))
+            {
+                if (int.TryParse(maxAgeValues.First(), out var maxAgeSeconds))
+                {
+                    if (maxAgeSeconds is > -1 and < 86400)
+                    {
+                        WriteLine(
+                            ConsoleColor.DarkGreen,
+                            "[PASSED] ",
+                            (byte)0x00,
+                            "Access-Control-Max-Age is valid.");
+                    }
+                    else
+                    {
+                        WriteLine(
+                            ConsoleColor.DarkYellow,
+                            "[PASSED] ",
+                            (byte)0x00,
+                            "Access-Control-Max-Age is outside \"normal\" range, 0 to 86400!");
+                    }
+                }
+                else
+                {
+                    WriteLine(
+                        ConsoleColor.DarkRed,
+                        "[FAILED] ",
+                        (byte)0x00,
+                        "Access-Control-Max-Age is invalid!");
+                }
+            }
+            else
+            {
+                WriteLine(
+                    ConsoleColor.DarkYellow,
+                    "[SKIPPED] ",
+                    (byte)0x00,
+                    "Access-Control-Max-Age was not used.");
             }
         }
         catch (Exception ex)
         {
             while (true)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                WriteLine(
+                    ConsoleColor.DarkRed,
+                    "[ERROR] ",
+                    (byte)0x00,
+                    ex.Message);
 
                 if (ex.InnerException is null)
                 {
@@ -208,7 +310,7 @@ internal static class Program
             "Performs a CORS preflight request and verifies the response.",
             "",
             "Usage:",
-            "  corstester <url> [<options>]",
+            $"  {Name.ToLower()} <url> <options>",
             "",
             "Options:",
             "  --method <string>    HTTP method to check for. Defaults to GET.",
@@ -280,7 +382,13 @@ internal static class Program
                         return false;
                     }
 
-                    options.Origin = args[i + 1];
+                    if (!Uri.TryCreate(args[i + 1], UriKind.Absolute, out var originUri))
+                    {
+                        Console.WriteLine($"Error: '{args[i + 1]}' is not a valid origin URL.");
+                        return false;
+                    }
+
+                    options.Origin = originUri;
                     skip = true;
                     break;
 
@@ -291,31 +399,37 @@ internal static class Program
                         return false;
                     }
 
-                    if (!Uri.TryCreate(argv, UriKind.Absolute, out var uri))
+                    if (!Uri.TryCreate(argv, UriKind.Absolute, out var requestUri))
                     {
                         Console.WriteLine($"Error: '{argv}' is not a valid URL.");
                         return false;
                     }
 
-                    options.Url = uri;
+                    options.Url = requestUri;
                     break;
             }
         }
 
-        if (options.Url is not null)
+        if (options.Url is null)
         {
-            return true;
+            Console.WriteLine("Error: You must specify a URL to request!");
+            return false;
         }
 
-        Console.WriteLine("Error: You must specify a URL to request.");
-        return false;
+        if (options.Origin is null)
+        {
+            Console.WriteLine("Error: You must specify an origin. Use the --origin or -o option to specify it.");
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
     /// Write objects to console.
     /// </summary>
     /// <param name="objects">Objects.</param>
-    private static void WriteLine(params object[] objects)
+    private static void WriteLine(params object?[] objects)
     {
         foreach (var obj in objects)
         {
@@ -325,7 +439,7 @@ internal static class Program
                     Console.ForegroundColor = cc;
                     break;
                 
-                case 0x00:
+                case byte and 0x00:
                     Console.ResetColor();
                     break;
                 

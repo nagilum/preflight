@@ -20,5 +20,5 @@ public interface IOptions
     /// <summary>
     /// Origin to ask for.
     /// </summary>
-    string? Origin { get; set; }
+    Uri? Origin { get; set; }
 }

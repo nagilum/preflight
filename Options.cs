@@ -20,5 +20,5 @@ public class Options : IOptions
     /// <summary>
     /// <inheritdoc cref="IOptions.Origin"/>
     /// </summary>
-    public string? Origin { get; set; }
+    public Uri? Origin { get; set; }
 }
