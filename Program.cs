@@ -3,6 +3,29 @@ using System.Net.Http.Headers;
 
 namespace Preflight;
 
+internal struct Options
+{
+    /// <summary>
+    /// URL to request.
+    /// </summary>
+    public Uri? Url { get; set; }
+    
+    /// <summary>
+    /// HTTP method to ask for.
+    /// </summary>
+    public string? HttpMethod { get; set; }
+    
+    /// <summary>
+    /// Headers to ask for.
+    /// </summary>
+    public string? Headers { get; set; }
+    
+    /// <summary>
+    /// Origin to ask for.
+    /// </summary>
+    public Uri? Origin { get; set; }
+}
+
 internal static class Program
 {
     /// <summary>
@@ -86,7 +109,7 @@ internal static class Program
     /// </summary>
     /// <param name="options">Parsed options.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    private static async Task PerformPreflightRequest(IOptions options, CancellationToken cancellationToken)
+    private static async Task PerformPreflightRequest(Options options, CancellationToken cancellationToken)
     {
         try
         {
@@ -332,9 +355,9 @@ internal static class Program
     /// <param name="args">Command line arguments.</param>
     /// <param name="options">Parsed options.</param>
     /// <returns>Success.</returns>
-    private static bool TryParseCmdArgs(string[] args, out IOptions options)
+    private static bool TryParseCmdArgs(string[] args, out Options options)
     {
-        options = new Options();
+        options = new();
 
         var skip = false;
 
@@ -409,6 +432,8 @@ internal static class Program
                     break;
             }
         }
+
+        options.HttpMethod ??= "GET";
 
         if (options.Url is null)
         {
