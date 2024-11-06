@@ -13,12 +13,16 @@ dotnet build
 ## How to Use
 
 ```bash
-preflight https://api.example.com/url-to-check --origin https://example.com
+preflight https://example.com/url-to-check --origin https://example.com
 ```
 
-This will perform an `OPTIONS` request to the `https://api.example.com/url-to-check` URL and add the `Origin` header with the value `https://example.com`. With the `Access-Control-Request-Method` header that is added automatically, and defaults to `GET`, this is all that is required to perform a basic CORS preflight request.
+This will perform an `OPTIONS` request to the `https://example.com/url-to-check` URL and add the `Origin` header with the value `https://example.com`. With the `Access-Control-Request-Method` header that is added automatically, and defaults to `GET`, this is all that is required to perform a basic CORS preflight request.
+
+![Output Example](output.png?raw=true)
 
 ## More Options
+
+You can add more checks by using the options below.
 
 ### HTTP Method
 
