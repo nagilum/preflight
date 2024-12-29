@@ -36,7 +36,7 @@ internal static class Program
     /// <summary>
     /// Program version.
     /// </summary>
-    private const string Version = "0.1-alpha";
+    private const string Version = "0.2-beta";
     
     /// <summary>
     /// Init all the things...
@@ -75,7 +75,7 @@ internal static class Program
     }
 
     /// <summary>
-    /// Get all headers from a HTTP response message.
+    /// Get all headers from an HTTP response message.
     /// </summary>
     /// <param name="res">HTTP response message.</param>
     /// <returns>Headers.</returns>
@@ -111,6 +111,11 @@ internal static class Program
     /// <param name="cancellationToken">Cancellation token.</param>
     private static async Task PerformPreflightRequest(Options options, CancellationToken cancellationToken)
     {
+        var testsPassed = 0;
+        var testsFailed = 0;
+        var testsSkipped = 0;
+        var testsNotRan = 5;
+        
         try
         {
             using var client = new HttpClient();
@@ -138,7 +143,6 @@ internal static class Program
                 ConsoleColor.DarkCyan,
                 "[REQUEST] ",
                 (byte)0x00,
-                "OPTIONS ",
                 options.Url);
 
             foreach (var (key, value) in req.Headers)
@@ -186,6 +190,8 @@ internal static class Program
                     "[PASSED] ",
                     (byte)0x00,
                     "Status Code is either 200 or 204.");
+
+                testsPassed++;
             }
             else
             {
@@ -195,7 +201,11 @@ internal static class Program
                     "[FAILED] ",
                     (byte)0x00,
                     "Status Code was neither 200 or 204!");
+                
+                testsFailed++;
             }
+            
+            testsNotRan--;
             
             // Do we have and allowed origin?
             if (res.Headers.Contains("Access-Control-Allow-Origin"))
@@ -205,6 +215,8 @@ internal static class Program
                     "[PASSED] ",
                     (byte)0x00,
                     "Origin matches Access-Control-Allow-Origin.");
+                
+                testsPassed++;
             }
             else
             {
@@ -213,7 +225,11 @@ internal static class Program
                     "[FAILED] ",
                     (byte)0x00,
                     "Response did not contain Access-Control-Allow-Origin header!");
+                
+                testsFailed++;
             }
+            
+            testsNotRan--;
             
             // Do we have an allowed HTTP method?
             if (res.Headers.Contains("Access-Control-Allow-Methods"))
@@ -223,6 +239,8 @@ internal static class Program
                     "[PASSED] ",
                     (byte)0x00,
                     "Access-Control-Request-Method matches Access-Control-Allow-Methods.");
+                
+                testsPassed++;
             }
             else
             {
@@ -231,7 +249,11 @@ internal static class Program
                     "[FAILED] ",
                     (byte)0x00,
                     "Response did not contain Access-Control-Allow-Methods header!");
+                
+                testsFailed++;
             }
+            
+            testsNotRan--;
             
             // Are we checking headers?
             if (options.Headers is not null)
@@ -243,6 +265,8 @@ internal static class Program
                         "[PASSED] ",
                         (byte)0x00,
                         "Access-Control-Request-Headers matches Access-Control-Allow-Headers.");
+                    
+                    testsPassed++;
                 }
                 else
                 {
@@ -251,6 +275,8 @@ internal static class Program
                         "[FAILED] ",
                         (byte)0x00,
                         "Response did not contain Access-Control-Allow-Headers header!");
+                    
+                    testsFailed++;
                 }
             }
             else
@@ -260,7 +286,11 @@ internal static class Program
                     "[SKIPPED] ",
                     (byte)0x00,
                     "Access-Control-Request-Headers was not used.");
+                
+                testsSkipped++;
             }
+            
+            testsNotRan--;
             
             // Do we have max-age?
             if (res.Headers.TryGetValues("Access-Control-Max-Age", out var maxAgeValues))
@@ -283,6 +313,8 @@ internal static class Program
                             (byte)0x00,
                             "Access-Control-Max-Age is outside \"normal\" range, 0 to 86400!");
                     }
+                    
+                    testsPassed++;
                 }
                 else
                 {
@@ -291,6 +323,8 @@ internal static class Program
                         "[FAILED] ",
                         (byte)0x00,
                         "Access-Control-Max-Age is invalid!");
+                    
+                    testsFailed++;
                 }
             }
             else
@@ -300,7 +334,11 @@ internal static class Program
                     "[SKIPPED] ",
                     (byte)0x00,
                     "Access-Control-Max-Age was not used.");
+
+                testsSkipped++;
             }
+            
+            testsNotRan--;
         }
         catch (Exception ex)
         {
@@ -320,6 +358,26 @@ internal static class Program
                 ex = ex.InnerException;
             }
         }
+        
+        WriteLine(
+            ConsoleColor.White,
+            "[INFO] ",
+            ConsoleColor.White,
+            testsPassed,
+            (byte)0x00,
+            " test(s) passed, ",
+            ConsoleColor.White,
+            testsFailed,
+            (byte)0x00,
+            " test(s) failed, ",
+            ConsoleColor.White,
+            testsSkipped,
+            (byte)0x00,
+            " test(s) skipped, ",
+            ConsoleColor.White,
+            testsNotRan,
+            (byte)0x00,
+            " test(s) not ran.");
     }
 
     /// <summary>
@@ -357,7 +415,7 @@ internal static class Program
     /// <returns>Success.</returns>
     private static bool TryParseCmdArgs(string[] args, out Options options)
     {
-        options = new();
+        options = new Options();
 
         var skip = false;
 
